@@ -1,25 +1,34 @@
+#ifndef _POLY_
+#define _POLY_
 #include <cstdio>
 #include <vector>
 #include <cmath>
-#define Initial 0.000000
+#include <string>
+#include "fastSort_Vector.cpp"
+#endif
+
 using namespace std;
+const int init = 0.0;
 
 class polynomial{
+public:
+    static const int A = 10;
 
-    private:
-        vector<double> basis;
+private:
+    vector<double> basis;
 
-    public:
-        polynomial(vector<double> initialVal) : basis(initialVal) {}
-        vector<double> getBasis() { return basis; }
-        polynomial add(polynomial);
-        polynomial multiplication(polynomial);
-        polynomial multiply(double);
-        polynomial differentiate();
-        double value(double x);
-        void Change(vector<double> Vec) { basis = Vec; }
-        void visualize();
-        double NewtonIter(double);
+public:
+    polynomial(vector<double> initialVal) : basis(initialVal) {}
+    ~polynomial() {}
+    vector<double> getBasis() { return basis; }
+    polynomial operator+(polynomial);
+    polynomial operator*(polynomial);
+    polynomial operator*(double);
+    polynomial differentiate();
+    double value(double x);
+    void Change(vector<double> Vec) { basis = Vec; }
+    void visualize() const;
+    double NewtonIter(double);
 
 };
 
@@ -43,7 +52,7 @@ polynomial polynomial::differentiate(){
     return Temp;
 }
 
-void polynomial::visualize(){
+void polynomial::visualize() const{
     for (vector<double>::size_type s = 0; s < (*this).basis.size(); s ++ ){
         printf("%fx^%d  ", (*this).basis[s], (int)s);
     }
@@ -52,16 +61,19 @@ void polynomial::visualize(){
 
 double polynomial::NewtonIter(double x){
     polynomial Poly = *this;
-    for (int i = 0; i < 100; i++){
+    for (int i = 0; i < 30; i++){
         double y = Poly.value(x);
         polynomial diff = Poly.differentiate();
         double k = diff.value(x);
+        if (k == 0.0){
+            break;
+        }
         x = x - y / k;
     }
     return x;
 }
 
-polynomial polynomial::add(polynomial P){
+polynomial polynomial::operator+(polynomial P){
     auto self_size = (*this).basis.size(), P_size = P.basis.size();
     if (self_size >= P_size){
         for (vector<double>::size_type s = 0; s < P_size; s++){
@@ -77,8 +89,8 @@ polynomial polynomial::add(polynomial P){
     }
 }
 
-polynomial polynomial::multiplication(polynomial P){
-    vector<double> TempVec((*this).basis.size() + P.basis.size() - 1, Initial);
+polynomial polynomial::operator*(polynomial P){
+    vector<double> TempVec((*this).basis.size() + P.basis.size() - 1, init);
     polynomial Temp(TempVec);
     for (vector<double>::size_type s = 0; s < (*this).basis.size(); s++){
         for (vector<double>::size_type t = 0; t < P.basis.size(); t++){
@@ -88,7 +100,7 @@ polynomial polynomial::multiplication(polynomial P){
     return Temp;
 }
 
-polynomial polynomial::multiply(double x){
+polynomial polynomial::operator*(double x){
     polynomial Temp = (*this);
     for (auto &s : Temp.basis){
         s *= x;

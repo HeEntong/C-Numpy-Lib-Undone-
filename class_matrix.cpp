@@ -4,11 +4,11 @@
 #include "class_polynomial.cpp"
 #include <iostream>
 #include <algorithm>
-using namespace std;
-#define init 0.0000000
+
 inline double innerProd(vector<double>, vector<double>);
 vector<double> colVec(vector<vector<double>>, double);
 auto VecToPoly(vector<vector<double>>) -> vector<vector<polynomial>>;
+inline bool isAllZero(vector<double>);
 
 class matrix{
 private:
@@ -27,26 +27,27 @@ public:
     }
 
     void changeElements(double x, int i, int j){
-        (*this).elements[i][j] = x;
+        elements[i][j] = x;
         return;
     }
 
     void changePoly(polynomial x, int i, int j){
-        (*this).polyElements[i][j] = x;
+        polyElements[i][j] = x;
         return;
     }
 
+    void gaussianElimination();
 
-    void add(matrix);
+    matrix operator+(matrix);
 
-    matrix multiplication(matrix);
-    void multiplication(double);
+    matrix operator*(matrix);
+    matrix operator *(double);
 
-    void print();
+    void print() const;
 
     void polyPrint();
 
-    void transpose();
+    matrix transpose();
 
     double Eigen_PowIter(matrix);
 
@@ -61,14 +62,19 @@ public:
     matrix polyCofactor(int , int);
 
     vector<double> Eigen_NewtonIter();
+
+    
 };
 
-void matrix::add(matrix mat){
-    for (vector<vector<double>>::size_type s = 0; s < (*this).elements.size(); s++){
-        for (vector<double>::size_type t = 0; t < (*this).elements[s].size(); t++){
-            (*this).elements[s][t] += (mat).elements[s][t];
+matrix unitmatrix(double, int);
+
+matrix matrix::operator+(matrix mat){
+    for (vector<vector<double>>::size_type s = 0; s < elements.size(); s++){
+        for (vector<double>::size_type t = 0; t < elements[s].size(); t++){
+            elements[s][t] += (mat).elements[s][t];
         }
     }
+    return *this;
 }
 
 inline double innerProd(vector<double> V1, vector<double> V2){
@@ -81,6 +87,15 @@ inline double innerProd(vector<double> V1, vector<double> V2){
     return sum;
 }
 
+inline bool isAllZero(vector<double> Vec){
+    for (auto s : Vec){
+        if (s != 0.00){
+            return false;
+        }
+    }
+    return true;
+}
+
 vector<double> colVec(vector<vector<double>> Vec, double index){
     vector<double> COL;
     for (auto s : Vec){
@@ -89,12 +104,15 @@ vector<double> colVec(vector<vector<double>> Vec, double index){
     return COL;
 }
 
-matrix matrix::multiplication(matrix mat){
+matrix matrix::operator*(matrix mat){
+    if (elements[0].size() != mat.elements.size()){
+        throw;
+    }
     vector<vector<double>> Result;
-    for (vector<vector<double>>::size_type s = 0; s < (*this).elements.size(); s++){
+    for (vector<vector<double>>::size_type s = 0; s < elements.size(); s++){
         vector<double> Row;
         for (vector<double>::size_type i = 0; i < (mat).elements[0].size(); i++){
-            double S = innerProd((*this).elements[s], colVec((mat).elements, i));
+            double S = innerProd(elements[s], colVec((mat).elements, i));
             Row.push_back(S);
         }
         Result.push_back(Row);
@@ -103,39 +121,77 @@ matrix matrix::multiplication(matrix mat){
     return Res;
 }
 
-void matrix::multiplication(double coef){
-    for (auto &s : (*this).elements){
+matrix matrix::operator*(double coef){
+    for (auto &s : elements){
         for (auto &t : s){
             t *= coef;
         }
     }
-    return;
+    return (*this);
 }
-void matrix::transpose(){
-    vector<double> Row((*this).elements.size(), init);
-    vector<vector<double>> TrMat((*this).elements[0].size(), Row);
-    for (vector<vector<double>>::size_type s = 0; s < (*this).elements[0].size(); s++){
-        for (vector<vector<double>>::size_type t = 0; t < (*this).elements.size(); t++){
-            TrMat[s][t] = (*this).elements[t][s];
+
+void matrix::gaussianElimination(){
+    using std::swap;
+    size_t xlen = elements.size();
+    size_t ylen = elements[0].size();
+    matrix resultMatrix = *this;
+    int colNum = 0;
+    for (size_t k = 0; k < xlen; k++){
+        if (elements[k][colNum] == 0.00){
+            for (size_t i = k + 1; i < xlen + 1; i++){
+                if (i == xlen){
+                    colNum++;
+                    break;
+                }
+                if (elements[i][colNum] != 0.00){
+                    swap(elements[i], elements[k]);
+                    break;
+                }
+            }
+        }
+        if (isAllZero(elements[k])){
+            break;
+        }
+        for (size_t i = k + 1; i < xlen; i++){
+            double coef = elements[i][colNum] / elements[k][colNum];
+            for (size_t j = 0; j < ylen; j++){
+                elements[i][j] -= elements[k][j] * coef;
+            }
+        }
+        for (size_t i = 0; i < k; i++){
+            double coef = elements[i][colNum] / elements[k][colNum];
+            for (size_t j = 0; j < ylen; j++){
+                elements[i][j] -= elements[k][j] * coef;
+            }
+        }
+        colNum++;
+    }
+}
+
+matrix matrix::transpose(){
+    vector<double> Row(elements.size(), init);
+    vector<vector<double>> TrMat(elements[0].size(), Row);
+    for (vector<vector<double>>::size_type s = 0; s < elements[0].size(); s++){
+        for (vector<vector<double>>::size_type t = 0; t < elements.size(); t++){
+            TrMat[s][t] = elements[t][s];
         }
     }
-    (*this).elements = TrMat;
-    return;
+    return TrMat;
 }
 
 double matrix::Eigen_PowIter(matrix unitVec){
     matrix leftMat = (*this);
-    matrix Eigen = (leftMat).multiplication(unitVec);
+    matrix Eigen = leftMat * unitVec;
     for (int i = 0; i < 100; i++){
-        Eigen = leftMat.multiplication(Eigen);
-        Eigen.multiplication(1 / sqrt
+        Eigen = leftMat * Eigen;
+        Eigen = Eigen * (1 / sqrt
         (innerProd(colVec(Eigen.elements, 0), colVec(Eigen.elements, 0))));
     }
     matrix transMat = Eigen;
     transMat.transpose();
     double lambda = 
-    (transMat.multiplication(leftMat)).multiplication(Eigen).elements[0][0] /
-     (transMat.multiplication(Eigen)).elements[0][0];
+    ((transMat*leftMat)*Eigen).elements[0][0] /
+     (transMat*Eigen).elements[0][0];
     return lambda;
 }
 
@@ -188,7 +244,7 @@ matrix matrix::inverse(){
     for (vector<vector<double>>::size_type s = 0; s < Copy.elements.size(); s++){
         vector<double> Temp;
         for (vector<double>::size_type t = 0; t < Copy.elements[0].size(); t++){
-            Temp.push_back(Copy.cofactor(t, s).determinant() / DET);
+            Temp.push_back((Copy.cofactor(t, s).determinant() / DET) * ((s + t) % 2 ? -1 : 1));
         }
         Storage.push_back(Temp);
     }
@@ -196,13 +252,16 @@ matrix matrix::inverse(){
     return Copy;
 }
 
-void matrix::print(){
-    for (auto i : (*this).elements){
+void matrix::print() const{
+    printf("[\n");
+    for (auto i : elements){
+        printf("  [");
         for (auto j : i){
-            printf("%f ", j);
+            printf("%f, ", j);
         }
-        printf("\n");
+        printf("]\n");
     }
+    printf("]");
 }
 
 void matrix::polyPrint(){
@@ -232,36 +291,53 @@ polynomial matrix::polyDeterminant(){
         return polyElements[0][0];
     }
     else{
-        /*int Mag = (*this).polyElements[0][0].getBasis().size();
-        
-        vector<double> Init(Mag, init);*/
         polynomial TempPoly({0.00000});
         for (int  s = 0; s < (int)(*this).getPoly().size(); s++){
             matrix TempCof = (*this).polyCofactor(s, 0);
             polynomial alCof = 
-            TempCof.polyDeterminant().multiplication(this->polyElements[s][0]);
-            alCof = alCof.multiply(s % 2 ? -1 : 1);
-            TempPoly = TempPoly.add(alCof);
+            TempCof.polyDeterminant() * this->polyElements[s][0];
+            alCof = alCof * (s % 2 ? -1 : 1);
+            TempPoly = TempPoly + alCof;
         }
         return TempPoly;
         }
 }
 
-vector<double> matrix::Eigen_NewtonIter(){
+matrix unitMatrix(double x, int size){
+    vector<double> zeros;
+    zeros.assign(size, 0.000);
+    vector<vector<double>> unitMat;
+    for (int i = 0; i < size; i++){
+        unitMat.push_back(zeros);
+    }
+    for (int i = 0; i < size; i++){
+        unitMat[i][i] = x;
+    }
+    return unitMat;
+}
+
+vector<double> matrix::Eigen_NewtonIter(){  
+    if (elements[0].size() != elements.size()){
+        throw;
+    }
     matrix Temp = *this;
     for (vector<vector<polynomial>>::size_type s = 0; s < Temp.polyElements.size(); s++){
-        polynomial K({Temp.polyElements[s][s].getBasis()[0], -1});
+        std::vector<double> temp = {Temp.polyElements[s][s].getBasis()[0], -1};
+        polynomial K(temp);
         Temp.changePoly(K, s, s);
     }
     polynomial EigenPoly = Temp.polyDeterminant();
     vector<double> EigenVal;
-    for (double i = -100.000; i < 100.0000; i++){
+    for (double i = -50.000; i < 50.0000; i++){
         EigenVal.push_back(EigenPoly.NewtonIter(i));
     }
-    /*for (auto &s : EigenVal){
-        s = ((int)(s * 1000)) / 1000;
-    }*/
-    sort(EigenVal.begin(), EigenVal.end());
-    
-    return EigenVal;
+    fastSort(EigenVal, 0, EigenVal.size());
+    vector<double> returnVal;
+    returnVal.push_back(EigenVal[0]);
+    for (size_t i = 0; i < EigenVal.size() - 1; i++){
+        if (EigenVal[i+1] - EigenVal[i] > 0.001 ){
+            returnVal.push_back(EigenVal[i + 1]);
+        }
+    }
+    return returnVal;
 }
